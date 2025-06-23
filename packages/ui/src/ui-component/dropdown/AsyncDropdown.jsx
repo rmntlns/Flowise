@@ -5,7 +5,7 @@ import axios from 'axios'
 
 // Material
 import Autocomplete, { autocompleteClasses } from '@mui/material/Autocomplete'
-import { Popper, CircularProgress, TextField, Box, Typography } from '@mui/material'
+import { Popper, CircularProgress, TextField, Box, Typography, Tooltip } from '@mui/material'
 import { useTheme, styled } from '@mui/material/styles'
 
 // API
@@ -31,18 +31,17 @@ const StyledPopper = styled(Popper)({
 const fetchList = async ({ name, nodeData, previousNodes, currentNode }) => {
     const selectedParam = nodeData.inputParams.find((param) => param.name === name)
     const loadMethod = selectedParam?.loadMethod
-    const username = localStorage.getItem('username')
-    const password = localStorage.getItem('password')
+
+    let config = {
+        headers: {
+            'x-request-from': 'internal',
+            'Content-type': 'application/json'
+        },
+        withCredentials: true
+    }
 
     let lists = await axios
-        .post(
-            `${baseURL}/api/v1/node-load-method/${nodeData.name}`,
-            { ...nodeData, loadMethod, previousNodes, currentNode },
-            {
-                auth: username && password ? { username, password } : undefined,
-                headers: { 'Content-type': 'application/json', 'x-request-from': 'internal' }
-            }
-        )
+        .post(`${baseURL}/api/v1/node-load-method/${nodeData.name}`, { ...nodeData, loadMethod, previousNodes, currentNode }, config)
         .then(async function (response) {
             return response.data
         })
@@ -176,7 +175,7 @@ export const AsyncDropdown = ({
                 multiple={multiple}
                 filterSelectedOptions={multiple}
                 size='small'
-                sx={{ mt: 1, width: '100%' }}
+                sx={{ mt: 1, width: multiple ? '90%' : '100%' }}
                 open={open}
                 onOpen={() => {
                     setOpen(true)
@@ -211,7 +210,8 @@ export const AsyncDropdown = ({
                     const matchingOptions = multiple
                         ? findMatchingOptions(options, internalValue)
                         : [findMatchingOptions(options, internalValue)].filter(Boolean)
-                    return (
+
+                    const textField = (
                         <TextField
                             {...params}
                             value={internalValue}
@@ -255,6 +255,20 @@ export const AsyncDropdown = ({
                                 )
                             }}
                         />
+                    )
+
+                    return !multiple ? (
+                        textField
+                    ) : (
+                        <Tooltip
+                            title={
+                                typeof internalValue === 'string' ? internalValue.replace(/[[\]"]/g, '').replace(/,/g, ', ') : internalValue
+                            }
+                            placement='top'
+                            arrow
+                        >
+                            {textField}
+                        </Tooltip>
                     )
                 }}
                 renderOption={(props, option) => (
