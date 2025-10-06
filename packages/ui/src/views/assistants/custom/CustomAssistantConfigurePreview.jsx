@@ -41,6 +41,7 @@ import ConfirmDialog from '@/ui-component/dialog/ConfirmDialog'
 import PromptGeneratorDialog from '@/ui-component/dialog/PromptGeneratorDialog'
 import { Available } from '@/ui-component/rbac/available'
 import ExpandTextDialog from '@/ui-component/dialog/ExpandTextDialog'
+import { SwitchInput } from '@/ui-component/switch/Switch'
 
 // API
 import assistantsApi from '@/api/assistants'
@@ -166,9 +167,10 @@ const CustomAssistantConfigurePreview = () => {
 
     const checkInputParamsMandatory = () => {
         let canSubmit = true
-
-        const inputParams = (selectedChatModel.inputParams ?? []).filter((inputParam) => !inputParam.hidden)
-        for (const inputParam of inputParams) {
+        const visibleInputParams = showHideInputParams(selectedChatModel).filter(
+            (inputParam) => !inputParam.hidden && inputParam.display !== false
+        )
+        for (const inputParam of visibleInputParams) {
             if (!inputParam.optional && (!selectedChatModel.inputs[inputParam.name] || !selectedChatModel.credential)) {
                 if (inputParam.type === 'credential' && !selectedChatModel.credential) {
                     canSubmit = false
@@ -183,8 +185,10 @@ const CustomAssistantConfigurePreview = () => {
         if (selectedTools.length > 0) {
             for (let i = 0; i < selectedTools.length; i++) {
                 const tool = selectedTools[i]
-                const inputParams = (tool.inputParams ?? []).filter((inputParam) => !inputParam.hidden)
-                for (const inputParam of inputParams) {
+                const visibleInputParams = showHideInputParams(tool).filter(
+                    (inputParam) => !inputParam.hidden && inputParam.display !== false
+                )
+                for (const inputParam of visibleInputParams) {
                     if (!inputParam.optional && (!tool.inputs[inputParam.name] || !tool.credential)) {
                         if (inputParam.type === 'credential' && !tool.credential) {
                             canSubmit = false
@@ -351,6 +355,7 @@ const CustomAssistantConfigurePreview = () => {
                 const retrieverToolNodeData = cloneDeep(initNode(retrieverToolNode.data, retrieverToolId))
 
                 set(docStoreVSNodeData, 'inputs.selectedStore', selectedDocumentStores[i].id)
+                set(docStoreVSNodeData, 'outputs.output', 'retriever')
 
                 const docStoreOption = documentStoreOptions.find((ds) => ds.name === selectedDocumentStores[i].id)
                 // convert to small case and replace space with underscore
@@ -364,7 +369,7 @@ const CustomAssistantConfigurePreview = () => {
                     name,
                     description: desc,
                     retriever: `{{${docStoreVSId}.data.instance}}`,
-                    returnSourceDocuments: true
+                    returnSourceDocuments: selectedDocumentStores[i].returnSourceDocuments ?? false
                 })
 
                 const docStoreVS = {
@@ -508,7 +513,8 @@ const CustomAssistantConfigurePreview = () => {
         } else if (setting === 'viewMessages') {
             setViewMessagesDialogProps({
                 title: 'View Messages',
-                chatflow: canvas.chatflow
+                chatflow: canvas.chatflow,
+                isChatflow: false
             })
             setViewMessagesDialogOpen(true)
         } else if (setting === 'viewLeads') {
@@ -671,7 +677,8 @@ const CustomAssistantConfigurePreview = () => {
             const newDocStore = {
                 id: docStoreId,
                 name: foundDocumentStoreOption?.label || '',
-                description: foundSelectedDocumentStore?.description || foundDocumentStoreOption?.description || ''
+                description: foundSelectedDocumentStore?.description || foundDocumentStoreOption?.description || '',
+                returnSourceDocuments: foundSelectedDocumentStore?.returnSourceDocuments ?? false
             }
 
             newSelectedDocumentStores.push(newDocStore)
@@ -1130,6 +1137,18 @@ const CustomAssistantConfigurePreview = () => {
                                                             onChange={(event) => {
                                                                 const newSelectedDocumentStores = [...selectedDocumentStores]
                                                                 newSelectedDocumentStores[index].description = event.target.value
+                                                                setSelectedDocumentStores(newSelectedDocumentStores)
+                                                            }}
+                                                        />
+                                                        <Stack sx={{ mt: 2, position: 'relative', alignItems: 'center' }} direction='row'>
+                                                            <Typography>Return Source Documents</Typography>
+                                                            <TooltipWithParser title='Return the actual source documents that were used to answer the question' />
+                                                        </Stack>
+                                                        <SwitchInput
+                                                            value={ds.returnSourceDocuments ?? false}
+                                                            onChange={(newValue) => {
+                                                                const newSelectedDocumentStores = [...selectedDocumentStores]
+                                                                newSelectedDocumentStores[index].returnSourceDocuments = newValue
                                                                 setSelectedDocumentStores(newSelectedDocumentStores)
                                                             }}
                                                         />

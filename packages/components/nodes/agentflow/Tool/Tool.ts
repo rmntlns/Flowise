@@ -1,5 +1,6 @@
 import { ICommonObject, INode, INodeData, INodeOptionsValue, INodeParams, IServerSideEventStreamer } from '../../../src/Interface'
 import { updateFlowState } from '../utils'
+import { processTemplateVariables } from '../../../src/utils'
 import { Tool } from '@langchain/core/tools'
 import { ARTIFACTS_PREFIX, TOOL_ARGS_PREFIX } from '../../../src/agents'
 import zodToJsonSchema from 'zod-to-json-schema'
@@ -161,7 +162,7 @@ class Tool_Agentflow implements INode {
                     toolInputArgs = { properties: allProperties }
                 } else {
                     // Handle single tool instance
-                    toolInputArgs = toolInstance.schema ? zodToJsonSchema(toolInstance.schema) : {}
+                    toolInputArgs = toolInstance.schema ? zodToJsonSchema(toolInstance.schema as any) : {}
                 }
 
                 if (toolInputArgs && Object.keys(toolInputArgs).length > 0) {
@@ -227,6 +228,37 @@ class Tool_Agentflow implements INode {
 
         let toolCallArgs: Record<string, any> = {}
 
+        const parseInputValue = (value: string): any => {
+            if (typeof value !== 'string') {
+                return value
+            }
+
+            // Remove escape characters (backslashes before special characters)
+            // ex: \["a", "b", "c", "d", "e"\]
+            let cleanedValue = value
+                .replace(/\\"/g, '"') // \" -> "
+                .replace(/\\\\/g, '\\') // \\ -> \
+                .replace(/\\\[/g, '[') // \[ -> [
+                .replace(/\\\]/g, ']') // \] -> ]
+                .replace(/\\\{/g, '{') // \{ -> {
+                .replace(/\\\}/g, '}') // \} -> }
+
+            // Try to parse as JSON if it looks like JSON/array
+            if (
+                (cleanedValue.startsWith('[') && cleanedValue.endsWith(']')) ||
+                (cleanedValue.startsWith('{') && cleanedValue.endsWith('}'))
+            ) {
+                try {
+                    return JSON.parse(cleanedValue)
+                } catch (e) {
+                    // If parsing fails, return the cleaned value
+                    return cleanedValue
+                }
+            }
+
+            return cleanedValue
+        }
+
         if (newToolNodeInstance.transformNodeInputsToToolArgs) {
             const defaultParams = newToolNodeInstance.transformNodeInputsToToolArgs(newNodeData)
 
@@ -239,10 +271,11 @@ class Tool_Agentflow implements INode {
         for (const item of toolInputArgs) {
             const variableName = item.inputArgName
             const variableValue = item.inputArgValue
-            toolCallArgs[variableName] = variableValue
+            toolCallArgs[variableName] = parseInputValue(variableValue)
         }
 
         const flowConfig = {
+            chatflowId: options.chatflowid,
             sessionId: options.sessionId,
             chatId: options.chatId,
             input: input,
@@ -298,14 +331,7 @@ class Tool_Agentflow implements INode {
                 sseStreamer.streamTokenEvent(chatId, toolOutput)
             }
 
-            // Process template variables in state
-            if (newState && Object.keys(newState).length > 0) {
-                for (const key in newState) {
-                    if (newState[key].toString().includes('{{ output }}')) {
-                        newState[key] = toolOutput
-                    }
-                }
-            }
+            newState = processTemplateVariables(newState, toolOutput)
 
             const returnOutput = {
                 id: nodeData.id,

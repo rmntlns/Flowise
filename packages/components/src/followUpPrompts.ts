@@ -56,7 +56,7 @@ export const generateFollowUpPrompts = async (
                     temperature: parseFloat(`${providerConfig.temperature}`)
                 })
                 // use structured output parser because withStructuredOutput is not working
-                const parser = StructuredOutputParser.fromZodSchema(FollowUpPromptType)
+                const parser = StructuredOutputParser.fromZodSchema(FollowUpPromptType as any)
                 const formatInstructions = parser.getFormatInstructions()
                 const prompt = PromptTemplate.fromTemplate(`
                     ${providerConfig.prompt}
@@ -95,8 +95,10 @@ export const generateFollowUpPrompts = async (
                 const model = new ChatOpenAI({
                     apiKey: credentialData.openAIApiKey,
                     model: providerConfig.modelName,
-                    temperature: parseFloat(`${providerConfig.temperature}`)
+                    temperature: parseFloat(`${providerConfig.temperature}`),
+                    useResponsesApi: true
                 })
+                // @ts-ignore
                 const structuredLLM = model.withStructuredOutput(FollowUpPromptType)
                 const structuredResponse = await structuredLLM.invoke(followUpPromptsPrompt)
                 return structuredResponse

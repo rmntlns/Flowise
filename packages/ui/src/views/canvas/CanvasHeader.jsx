@@ -76,7 +76,8 @@ const CanvasHeader = ({ chatflow, isAgentCanvas, isAgentflowV2, handleSaveFlow, 
         } else if (setting === 'viewMessages') {
             setViewMessagesDialogProps({
                 title: 'View Messages',
-                chatflow: chatflow
+                chatflow: chatflow,
+                isChatflow: isAgentflowV2 ? false : true
             })
             setViewMessagesDialogOpen(true)
         } else if (setting === 'viewLeads') {
@@ -206,7 +207,8 @@ const CanvasHeader = ({ chatflow, isAgentCanvas, isAgentflowV2, handleSaveFlow, 
             chatflowApiKeyId: chatflow.apikeyid,
             isFormDataRequired,
             isSessionMemory,
-            isAgentCanvas
+            isAgentCanvas,
+            isAgentflowV2
         })
         setAPIDialogOpen(true)
     }
