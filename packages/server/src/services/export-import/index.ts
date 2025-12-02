@@ -13,10 +13,12 @@ import { Tool } from '../../database/entities/Tool'
 import { Variable } from '../../database/entities/Variable'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getErrorMessage } from '../../errors/utils'
+import { Platform } from '../../Interface'
 import assistantsService from '../../services/assistants'
 import chatflowsService from '../../services/chatflows'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { checkUsageLimit } from '../../utils/quotaUsage'
+import { sanitizeNullBytes } from '../../utils/sanitize.util'
 import assistantService from '../assistants'
 import chatMessagesService from '../chat-messages'
 import chatflowService from '../chatflows'
@@ -25,8 +27,6 @@ import executionService, { ExecutionFilters } from '../executions'
 import marketplacesService from '../marketplaces'
 import toolsService from '../tools'
 import variableService from '../variables'
-import { Platform } from '../../Interface'
-import { sanitizeNullBytes } from '../../utils/sanitize.util'
 
 type ExportInput = {
     agentflow: boolean
@@ -90,7 +90,7 @@ const convertExportInput = (body: any): ExportInput => {
 }
 
 const FileDefaultName = 'ExportData.json'
-const exportData = async (exportInput: ExportInput, activeWorkspaceId?: string): Promise<{ FileDefaultName: string } & ExportData> => {
+const exportData = async (exportInput: ExportInput, activeWorkspaceId: string): Promise<{ FileDefaultName: string } & ExportData> => {
     try {
         let AgentFlow: ChatFlow[] | { data: ChatFlow[]; total: number } =
             exportInput.agentflow === true ? await chatflowService.getAllChatflows('MULTIAGENT', activeWorkspaceId) : []
@@ -101,17 +101,17 @@ const exportData = async (exportInput: ExportInput, activeWorkspaceId?: string):
         AgentFlowV2 = 'data' in AgentFlowV2 ? AgentFlowV2.data : AgentFlowV2
 
         let AssistantCustom: Assistant[] =
-            exportInput.assistantCustom === true ? await assistantService.getAllAssistants('CUSTOM', activeWorkspaceId) : []
+            exportInput.assistantCustom === true ? await assistantService.getAllAssistants(activeWorkspaceId, 'CUSTOM') : []
 
         let AssistantFlow: ChatFlow[] | { data: ChatFlow[]; total: number } =
             exportInput.assistantCustom === true ? await chatflowService.getAllChatflows('ASSISTANT', activeWorkspaceId) : []
         AssistantFlow = 'data' in AssistantFlow ? AssistantFlow.data : AssistantFlow
 
         let AssistantOpenAI: Assistant[] =
-            exportInput.assistantOpenAI === true ? await assistantService.getAllAssistants('OPENAI', activeWorkspaceId) : []
+            exportInput.assistantOpenAI === true ? await assistantService.getAllAssistants(activeWorkspaceId, 'OPENAI') : []
 
         let AssistantAzure: Assistant[] =
-            exportInput.assistantAzure === true ? await assistantService.getAllAssistants('AZURE', activeWorkspaceId) : []
+            exportInput.assistantAzure === true ? await assistantService.getAllAssistants(activeWorkspaceId, 'AZURE') : []
 
         let ChatFlow: ChatFlow[] | { data: ChatFlow[]; total: number } =
             exportInput.chatflow === true ? await chatflowService.getAllChatflows('CHATFLOW', activeWorkspaceId) : []
@@ -596,6 +596,15 @@ function reduceSpaceForChatflowFlowData(chatflows: ChatFlow[]) {
 function insertWorkspaceId(importedData: any, activeWorkspaceId?: string) {
     if (!activeWorkspaceId) return importedData
     importedData.forEach((item: any) => {
+        if (item.type === 'Tool') {
+            // TODO: This is a temporary fix where export data for CustomTemplate type Tool need to be changed in the future.
+            // Also handles backward compatibility for previously exported data where CustomTemplate type Tool does not have flowData field.
+            item.flowData = JSON.stringify({
+                iconSrc: item.iconSrc,
+                schema: item.schema,
+                func: item.func
+            })
+        }
         item.workspaceId = activeWorkspaceId
     })
     return importedData
