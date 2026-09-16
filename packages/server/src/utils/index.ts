@@ -812,6 +812,9 @@ export const getGlobalVariable = async (
     availableVariables: IVariable[] = [],
     variableOverrides: ICommonObject[] = []
 ) => {
+    // Request overrides must not change defaults reused by another resolution.
+    availableVariables = cloneDeep(availableVariables)
+
     // override variables defined in overrideConfig
     // nodeData.inputs.vars is an Object, check each property and override the variable
     if (overrideConfig?.vars && variableOverrides) {
@@ -1035,6 +1038,11 @@ export const resolveVariables = async (
     variableOverrides: ICommonObject[] = []
 ): Promise<INodeData> => {
     let flowNodeData = cloneDeep(reactFlowNodeData)
+    // replaceInputsWithConfig has already filtered the request's permitted vars.
+    const variableFlowConfig = {
+        ...flowConfig,
+        vars: flowNodeData.inputs?.vars ?? flowConfig?.vars
+    }
 
     const getParamValues = async (paramsObj: ICommonObject) => {
         for (const key in paramsObj) {
@@ -1048,7 +1056,7 @@ export const resolveVariables = async (
                         question,
                         chatHistory,
                         undefined,
-                        flowConfig,
+                        variableFlowConfig,
                         uploadedFilesContent,
                         availableVariables,
                         variableOverrides
@@ -1064,7 +1072,7 @@ export const resolveVariables = async (
                     question,
                     chatHistory,
                     isAcceptVariable,
-                    flowConfig,
+                    variableFlowConfig,
                     uploadedFilesContent,
                     availableVariables,
                     variableOverrides
